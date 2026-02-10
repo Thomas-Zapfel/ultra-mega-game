@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Medal of Honor PS1-Style Demo - Level 1: Bunker mit Texturen</title>
+    <title>Medal of Honor PS1-Style Demo - Level 1: Bunker mit 3D-Modellen</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: monospace; color: white; background: black; }
         canvas { display: block; }
@@ -14,37 +14,48 @@
             position: absolute; bottom: 10px; left: 10px; z-index: 100;
             font-size: 14px; text-shadow: 1px 1px 2px black;
         }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 24px; height: 24px; z-index: 100;
+            pointer-events: none;
+            color: lime; font-size: 24px; line-height: 24px; text-align: center;
+            text-shadow: 0 0 5px lime;
+            font-weight: bold;
+        }
+        #crosshair::before { content: '+'; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
+    <div id="crosshair"></div>
     <div id="ui">
         <div>Kills: <span id="score">0</span>/10</div>
         <div>Level: Bunker Breach</div>
     </div>
     <div id="instructions">
-        WASD: Bewegen | Maus: Schauen | Space: Springen | Klick: Schießen<br>
+        WASD: Bewegen | Maus: Schauen | Space: Springen | Klick: Schießen (Kugeln!)<br>
         Klicke zum Starten (Maus-Sperre)
     </div>
     <script>
         // Szene
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Heller Himmel
-        scene.fog = new THREE.Fog(0x808080, 5, 80); // PS1-Nebel
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x808080, 5, 80);
 
         // Kamera
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 12); // Start außerhalb
+        camera.position.set(0, 1.6, 12);
 
-        // Renderer (retro low-res)
+        // Renderer
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(1);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.BasicShadowMap; // Low-poly Schatten
+        renderer.shadowMap.type = THREE.BasicShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        // Clock für Delta-Time
+        // Clock
         const clock = new THREE.Clock();
 
         // Lichter
@@ -57,42 +68,26 @@
         dirLight.shadow.mapSize.height = 1024;
         scene.add(dirLight);
 
-        // Texture Loader
-        const loader = new THREE.TextureLoader();
-
-        // Texturen laden (LOCAL: Lade runter und packe in /textures/ !)
-        // Download-Links (CC0 free):
-        // ground.png: https://dl.polyhaven.com/file/ph-assets/Textures/png/1k/sand_01/sand_01_diff_1k.png
-        // wall.png: https://ambientcg.com/get?file=BrickWall025_1K_Color.png
-        // enemy.png: https://ambientcg.com/get?file=Fabric028_1K_Color.png
-        // ALTERNATIVE: Direkte URLs (könnte CORS haben):
-        // const groundTexture = loader.load('https://dl.polyhaven.com/file/ph-assets/Textures/png/1k/sand_01/sand_01_diff_1k.png');
-        const groundTexture = loader.load('textures/ground.png');
+        // Texture Loader für Boden/Wände (wie vorher)
+        const textureLoader = new THREE.TextureLoader();
+        const groundTexture = textureLoader.load('textures/ground.png');
         groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
         groundTexture.repeat.set(20, 20);
         groundTexture.encoding = THREE.sRGBEncoding;
-
-        const wallTexture = loader.load('textures/wall.png');
+        const wallTexture = textureLoader.load('textures/wall.png');
         wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
         wallTexture.repeat.set(2, 2);
 
-        const enemyTexture = loader.load('textures/enemy.png');
-        enemyTexture.wrapS = enemyTexture.wrapT = THREE.RepeatWrapping;
-        enemyTexture.repeat.set(1, 2);
-
-        // Materialien
         const groundMaterial = new THREE.MeshLambertMaterial({ map: groundTexture });
         const wallMaterial = new THREE.MeshLambertMaterial({ map: wallTexture });
-        const enemyMaterial = new THREE.MeshLambertMaterial({ map: enemyTexture });
 
-        // LEVEL DESIGN: Bunker (Raum mit Wänden)
+        // LEVEL (wie vorher)
         const groundGeometry = new THREE.PlaneGeometry(60, 60);
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Wände (Bunker-Wände)
         const walls = [];
         const wallGeometries = {
             long: new THREE.BoxGeometry(30, 6, 1),
@@ -100,12 +95,10 @@
             sandbag: new THREE.BoxGeometry(4, 1.5, 2)
         };
         const wallPositions = [
-            // Außenwände
-            { geo: 'long', pos: new THREE.Vector3(0, 3, -20), rot: 0 }, // Hintere Wand
-            { geo: 'long', pos: new THREE.Vector3(0, 3, 20), rot: 0 },  // Vordere (offen?)
+            { geo: 'long', pos: new THREE.Vector3(0, 3, -20), rot: 0 },
+            { geo: 'long', pos: new THREE.Vector3(0, 3, 20), rot: 0 },
             { geo: 'short', pos: new THREE.Vector3(-15, 3, 0), rot: Math.PI / 2 },
             { geo: 'short', pos: new THREE.Vector3(15, 3, 0), rot: Math.PI / 2 },
-            // Innere Barrikaden/Sandbags
             { geo: 'sandbag', pos: new THREE.Vector3(-8, 0.75, -10), rot: 0 },
             { geo: 'sandbag', pos: new THREE.Vector3(8, 0.75, -10), rot: 0 },
             { geo: 'sandbag', pos: new THREE.Vector3(0, 0.75, 5), rot: Math.PI / 4 }
@@ -120,29 +113,43 @@
             wall.receiveShadow = true;
             scene.add(wall);
             walls.push(wall);
-            geometry.computeBoundingBox();
+        });
+        const colliders = walls;
+
+        // 3D MODELLE für Gegner
+        const gltfLoader = new THREE.GLTFLoader();
+        let soldierModel;
+        const enemies = [];
+        gltfLoader.load('models/soldier.glb', (gltf) => {
+            soldierModel = gltf.scene;
+            soldierModel.scale.set(1.5, 1.5, 1.5); // Scale für low-poly Look
+            soldierModel.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            // 10 Clones positionieren
+            for (let i = 0; i < 10; i++) {
+                const enemy = soldierModel.clone();
+                enemy.position.set(
+                    (Math.random() - 0.5) * 30,
+                    0,
+                    (Math.random() - 0.5) * 30 - 5
+                );
+                enemy.rotation.y = Math.random() * Math.PI * 2;
+                enemy.userData.boundingBox = new THREE.Box3().setFromObject(enemy);
+                scene.add(enemy);
+                enemies.push(enemy);
+            }
+            console.log('Gegner-Modelle geladen!');
+        }, undefined, (error) => {
+            console.error('Fehler beim Laden des Modells:', error);
+            alert('Lade models/soldier.glb herunter! Siehe Anleitung.');
         });
 
-        // Kollider (für Physik)
-        const colliders = walls.map(w => w); // Alle Wände kollidierbar
-
-        // Gegner (10 rote Boxen mit Camo-Texture)
-        const enemies = [];
-        const enemyGeometry = new THREE.BoxGeometry(1, 2, 0.8);
-        enemyGeometry.computeBoundingBox();
-        for (let i = 0; i < 10; i++) {
-            const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-            enemy.position.set(
-                (Math.random() - 0.5) * 30,
-                1,
-                (Math.random() - 0.5) * 30 - 5 // Im Bunker-Bereich
-            );
-            enemy.castShadow = true;
-            scene.add(enemy);
-            enemies.push(enemy);
-        }
-
-        // Waffe (verbessert)
+        // Waffe
         const gunGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8);
         const gunMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
         const gun = new THREE.Mesh(gunGeometry, gunMaterial);
@@ -151,10 +158,10 @@
         camera.add(gun);
         scene.add(camera);
 
-        // Physik-Variablen
+        // Physik
         const velocity = new THREE.Vector3();
         const direction = new THREE.Vector3();
-        const speed = 20; // Units per second
+        const speed = 50; // **ERHÖHT: Schnellere Bewegung!**
         let isJumping = false;
         const gravity = 30;
         const playerRadius = 0.6;
@@ -178,26 +185,28 @@
             }
         });
 
-        // Schießen
-        let score = 0;
+        // **KUGELN-SCHIESSEN**
+        const bullets = [];
+        const bulletSpeed = 200;
         document.addEventListener('mousedown', (event) => {
             if (event.button === 0 && document.pointerLockElement) {
-                const raycaster = new THREE.Raycaster();
-                raycaster.setFromCamera(new THREE.Vector2(), camera);
-                const intersects = raycaster.intersectObjects(enemies);
-                if (intersects.length > 0) {
-                    const hit = intersects[0].object;
-                    scene.remove(hit);
-                    enemies.splice(enemies.indexOf(hit), 1);
-                    score++;
-                    document.getElementById('score').textContent = score;
-                    console.log('Hit! Kills:', score);
-                    if (score >= 10) alert('Level Cleared! Bunker gesichert.');
-                }
+                // Kugel erstellen
+                const bulletGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+                const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+                bullet.position.copy(camera.position);
+                const forward = new THREE.Vector3(0, 0, -1);
+                forward.applyQuaternion(camera.quaternion);
+                bullet.userData.velocity = forward.multiplyScalar(bulletSpeed);
+                scene.add(bullet);
+                bullets.push(bullet);
             }
         });
 
-        // Kollisions-Check
+        let score = 0;
+        const scoreEl = document.getElementById('score');
+
+        // Kollision Player
         function checkCollision(newPos) {
             const playerBox = new THREE.Box3().setFromCenterAndSize(newPos, new THREE.Vector3(playerRadius*2, playerHeight, playerRadius*2));
             for (let collider of colliders) {
@@ -208,10 +217,10 @@
             return true;
         }
 
-        // Animate Loop
+        // Animate
         function animate() {
             requestAnimationFrame(animate);
-            const delta = Math.min(0.05, clock.getDelta()); // Cap delta
+            const delta = Math.min(0.05, clock.getDelta());
 
             // Bewegung
             velocity.x = 0;
@@ -232,13 +241,13 @@
 
             // Jump & Gravity
             if (keys['Space'] && !isJumping) {
-                velocity.y = 8 * delta;
+                velocity.y = 8;
                 isJumping = true;
             }
             velocity.y -= gravity * delta;
-            const newPos = camera.position.clone().addScaledVector(velocity, delta);
+            const newPos = camera.position.clone().add(velocity.clone().multiplyScalar(delta));
 
-            // Y-Kollision (Boden)
+            // Y-Kollision
             if (newPos.y < 1.6) {
                 newPos.y = 1.6;
                 velocity.y = 0;
@@ -251,8 +260,42 @@
             if (checkCollision(testPos)) {
                 camera.position.copy(newPos);
             } else {
-                // Slide along walls (simple)
                 velocity.multiplyScalar(0.7);
+            }
+
+            // **KUGELN UPDATE & KOLLISIONEN**
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.position.add(bullet.userData.velocity.clone().multiplyScalar(delta));
+
+                // Out of bounds?
+                if (bullet.position.length() > 100) {
+                    scene.remove(bullet);
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Check hit enemies
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    if (!enemy.userData.boundingBox) continue; // Noch nicht geladen
+                    enemy.userData.boundingBox.setFromObject(enemy); // Update
+                    const bulletSphere = new THREE.Sphere(bullet.position, 0.1);
+                    if (bulletSphere.intersectsBox(enemy.userData.boundingBox)) {
+                        // Hit!
+                        scene.remove(enemy);
+                        enemies.splice(j, 1);
+                        scene.remove(bullet);
+                        bullets.splice(i, 1);
+                        score++;
+                        scoreEl.textContent = score;
+                        console.log('Hit! Kills:', score);
+                        if (score >= 10) {
+                            alert('Level Cleared! Bunker gesichert. 🏆');
+                        }
+                        break;
+                    }
+                }
             }
 
             renderer.render(scene, camera);
