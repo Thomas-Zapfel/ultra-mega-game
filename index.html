@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Medal of Honor PS1-Style Demo - Level 1: Bunker mit 3D-Modellen</title>
+    <title>Medal of Honor PS1-Style Demo - Level 1: Bunker mit GLTF-Modellen</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: monospace; color: white; background: black; }
         canvas { display: block; }
@@ -23,11 +23,17 @@
             font-weight: bold;
         }
         #crosshair::before { content: '+'; }
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 200; font-size: 24px; color: lime;
+        }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- Updated to Three.js r182 (latest 2026) -->
+    <script src="https://unpkg.com/three@0.182.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.182.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
+    <div id="loading">Lade Soldaten-Modelle... (klicke zum Starten)</div>
     <div id="crosshair"></div>
     <div id="ui">
         <div>Kills: <span id="score">0</span>/10</div>
@@ -35,7 +41,7 @@
     </div>
     <div id="instructions">
         WASD: Bewegen | Maus: Schauen | Space: Springen | Klick: Schießen (Kugeln!)<br>
-        Klicke zum Starten (Maus-Sperre)
+        Ziel: 10 Nazis eliminieren!
     </div>
     <script>
         // Szene
@@ -66,9 +72,11 @@
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 1024;
         dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 100;
         scene.add(dirLight);
 
-        // Texture Loader für Boden/Wände (wie vorher)
+        // Texturen (für Level)
         const textureLoader = new THREE.TextureLoader();
         const groundTexture = textureLoader.load('textures/ground.png');
         groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -81,7 +89,7 @@
         const groundMaterial = new THREE.MeshLambertMaterial({ map: groundTexture });
         const wallMaterial = new THREE.MeshLambertMaterial({ map: wallTexture });
 
-        // LEVEL (wie vorher)
+        // LEVEL (Bunker)
         const groundGeometry = new THREE.PlaneGeometry(60, 60);
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
@@ -116,38 +124,70 @@
         });
         const colliders = walls;
 
-        // 3D MODELLE für Gegner
+        // **3D MODELLE: Passe deine Sketchfab-Dateien an!**
         const gltfLoader = new THREE.GLTFLoader();
         let soldierModel;
         const enemies = [];
-        gltfLoader.load('models/soldier.glb', (gltf) => {
-            soldierModel = gltf.scene;
-            soldierModel.scale.set(1.5, 1.5, 1.5); // Scale für low-poly Look
-            soldierModel.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
+        let modelsLoaded = false;
 
-            // 10 Clones positionieren
-            for (let i = 0; i < 10; i++) {
-                const enemy = soldierModel.clone();
-                enemy.position.set(
-                    (Math.random() - 0.5) * 30,
-                    0,
-                    (Math.random() - 0.5) * 30 - 5
-                );
-                enemy.rotation.y = Math.random() * Math.PI * 2;
-                enemy.userData.boundingBox = new THREE.Box3().setFromObject(enemy);
-                scene.add(enemy);
-                enemies.push(enemy);
+        gltfLoader.load(
+            'models/soldier/scene.gltf',  // <-- DEIN PFAD: scene.gltf !
+            (gltf) => {
+                soldierModel = gltf.scene;
+                soldierModel.scale.set(2, 2, 2);  // Angepasst für perfekte Größe
+                soldierModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.material = new THREE.MeshLambertMaterial({ 
+                            map: child.material.map, 
+                            color: child.material.color 
+                        });  // Retro-Lambert für PS1-Look
+                    }
+                });
+                soldierModel.updateMatrixWorld(true);
+
+                // 10 Clones
+                for (let i = 0; i < 10; i++) {
+                    const enemy = soldierModel.clone();
+                    enemy.position.set(
+                        (Math.random() - 0.5) * 30,
+                        0,  // Y=0 für Füße auf Boden
+                        (Math.random() - 0.5) * 30 - 5
+                    );
+                    enemy.rotation.y = Math.random() * Math.PI * 2;
+                    enemy.userData.boundingBox = new THREE.Box3().setFromObject(enemy);
+                    scene.add(enemy);
+                    enemies.push(enemy);
+                }
+                modelsLoaded = true;
+                document.getElementById('loading').style.display = 'none';
+                console.log('✅ 10 Nazi-Soldaten geladen! Schieß los!');
+            },
+            (progress) => {
+                console.log('Lade Modell: ', (progress.loaded / progress.total * 100) + '%');
+            },
+            (error) => {
+                console.error('❌ Modell-Laden fehlgeschlagen:', error);
+                document.getElementById('loading').innerHTML = 'Modell-Fehler! Erstelle Fallback-Boxen...';
+                // Fallback: Rote Boxen
+                const enemyGeometry = new THREE.BoxGeometry(1, 2, 0.8);
+                const enemyMaterial = new THREE.MeshLambertMaterial({ color: 0x8B0000 });
+                for (let i = 0; i < 10; i++) {
+                    const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+                    enemy.position.set(
+                        (Math.random() - 0.5) * 30,
+                        1,
+                        (Math.random() - 0.5) * 30 - 5
+                    );
+                    enemy.castShadow = true;
+                    scene.add(enemy);
+                    enemies.push(enemy);
+                }
+                modelsLoaded = true;
+                document.getElementById('loading').style.display = 'none';
             }
-            console.log('Gegner-Modelle geladen!');
-        }, undefined, (error) => {
-            console.error('Fehler beim Laden des Modells:', error);
-            alert('Lade models/soldier.glb herunter! Siehe Anleitung.');
-        });
+        );
 
         // Waffe
         const gunGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8);
@@ -158,22 +198,24 @@
         camera.add(gun);
         scene.add(camera);
 
-        // Physik
+        // Physik & Steuerung (wie vorher, schnell!)
         const velocity = new THREE.Vector3();
         const direction = new THREE.Vector3();
-        const speed = 50; // **ERHÖHT: Schnellere Bewegung!**
+        const speed = 50;
         let isJumping = false;
         const gravity = 30;
         const playerRadius = 0.6;
         const playerHeight = 1.8;
 
-        // Steuerung
         const keys = {};
         document.addEventListener('keydown', (e) => { keys[e.code] = true; });
         document.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
-        // Pointer Lock
-        document.addEventListener('click', () => renderer.domElement.requestPointerLock());
+        document.addEventListener('click', () => {
+            if (!modelsLoaded) return;
+            renderer.domElement.requestPointerLock();
+        });
+
         let euler = new THREE.Euler(0, 0, 0, 'YXZ');
         document.addEventListener('mousemove', (event) => {
             if (document.pointerLockElement === renderer.domElement) {
@@ -185,12 +227,11 @@
             }
         });
 
-        // **KUGELN-SCHIESSEN**
+        // Kugeln
         const bullets = [];
         const bulletSpeed = 200;
         document.addEventListener('mousedown', (event) => {
-            if (event.button === 0 && document.pointerLockElement) {
-                // Kugel erstellen
+            if (event.button === 0 && document.pointerLockElement && modelsLoaded) {
                 const bulletGeometry = new THREE.SphereGeometry(0.05, 8, 8);
                 const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
                 const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
@@ -206,7 +247,6 @@
         let score = 0;
         const scoreEl = document.getElementById('score');
 
-        // Kollision Player
         function checkCollision(newPos) {
             const playerBox = new THREE.Box3().setFromCenterAndSize(newPos, new THREE.Vector3(playerRadius*2, playerHeight, playerRadius*2));
             for (let collider of colliders) {
@@ -217,12 +257,16 @@
             return true;
         }
 
-        // Animate
         function animate() {
             requestAnimationFrame(animate);
             const delta = Math.min(0.05, clock.getDelta());
 
-            // Bewegung
+            if (!modelsLoaded) {
+                renderer.render(scene, camera);
+                return;
+            }
+
+            // Bewegung (schnell!)
             velocity.x = 0;
             velocity.z = 0;
             direction.z = Number(keys['KeyW']) - Number(keys['KeyS']);
@@ -247,14 +291,12 @@
             velocity.y -= gravity * delta;
             const newPos = camera.position.clone().add(velocity.clone().multiplyScalar(delta));
 
-            // Y-Kollision
             if (newPos.y < 1.6) {
                 newPos.y = 1.6;
                 velocity.y = 0;
                 isJumping = false;
             }
 
-            // XZ-Kollision
             const testPos = newPos.clone();
             testPos.y = 1.6;
             if (checkCollision(testPos)) {
@@ -263,35 +305,30 @@
                 velocity.multiplyScalar(0.7);
             }
 
-            // **KUGELN UPDATE & KOLLISIONEN**
+            // Kugeln & Hits
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.position.add(bullet.userData.velocity.clone().multiplyScalar(delta));
 
-                // Out of bounds?
                 if (bullet.position.length() > 100) {
                     scene.remove(bullet);
                     bullets.splice(i, 1);
                     continue;
                 }
 
-                // Check hit enemies
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     const enemy = enemies[j];
-                    if (!enemy.userData.boundingBox) continue; // Noch nicht geladen
-                    enemy.userData.boundingBox.setFromObject(enemy); // Update
-                    const bulletSphere = new THREE.Sphere(bullet.position, 0.1);
+                    enemy.userData.boundingBox.setFromObject(enemy);
+                    const bulletSphere = new THREE.Sphere(bullet.position, 0.15);  // Etwas größer für Hits
                     if (bulletSphere.intersectsBox(enemy.userData.boundingBox)) {
-                        // Hit!
                         scene.remove(enemy);
                         enemies.splice(j, 1);
                         scene.remove(bullet);
                         bullets.splice(i, 1);
                         score++;
                         scoreEl.textContent = score;
-                        console.log('Hit! Kills:', score);
                         if (score >= 10) {
-                            alert('Level Cleared! Bunker gesichert. 🏆');
+                            alert('🥇 LEVEL CLEARED! Bunker gesichert. Neuer Rekord?');
                         }
                         break;
                     }
@@ -302,7 +339,6 @@
         }
         animate();
 
-        // Resize
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
