@@ -29,13 +29,11 @@
         }
     </style>
     <!-- Updated to Three.js r182 (latest 2026) -->
-    <!-- ZUERST Three.js core laden -->
+   <!-- 1. Three.js Core laden -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.min.js"></script>
-    
-    <!-- DANN die Addons (GLTFLoader usw.) -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.182.0/examples/js/loaders/GLTFLoader.min.js"></script>
-    <script src="https://unpkg.com/three@0.182.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.182.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- 2. Addons / Loaders (nach Core!) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/loaders/GLTFLoader.js"></script>
 </head>
 <body>
     <div id="loading">Lade Soldaten-Modelle... (klicke zum Starten)</div>
